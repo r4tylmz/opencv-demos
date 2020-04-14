@@ -82,7 +82,6 @@ while 1:
     #Update counter as the direction change has been detected.
     counter += 1
 
-    #If q is pressed, close the window
     if(key == ord('q')):
         break
   
