@@ -7,7 +7,7 @@ import time
 cap = cv2.VideoCapture(0)
 #cap = cv2.VideoCapture(R"C:\Users\rain\Desktop\OPENCV TEST VIDEOS\b4.mp4")
 time.sleep(2)
-kernel = ((5, 5))
+kernel = np.ones((5,5),np.uint8)
 lower_blue = np.array([100, 60, 60])
 upper_blue = np.array([140, 255, 255])
 
@@ -49,7 +49,7 @@ cv2.putText(paintWindow, "SARI", (520, 33), font,
 
 while 1:
     ret, frame = cap.read()
-    #frame = cv2.flip(frame, 1)
+    frame = cv2.flip(frame, 1)
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
     frame = cv2.rectangle(frame, (40, 1), (140, 65), (0, 0, 0), 2)
@@ -75,7 +75,7 @@ while 1:
 
     mask = cv2.inRange(hsv, lower_blue, upper_blue)
     mask = cv2.erode(mask, kernel, iterations=2)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
     mask = cv2.dilate(mask, kernel, iterations=1)
 
     contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -149,7 +149,7 @@ while 1:
     cv2.imshow('paint', paintWindow)
 
     
-    if cv2.waitKey(3) and 0xFF == ord('q'):
+    if cv2.waitKey(3) and 0xFF == ord("q"):
         break
 
 
