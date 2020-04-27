@@ -4,6 +4,7 @@ from collections import deque
 from scipy.spatial import distance as dist
 from collections import OrderedDict
 import time
+import random
 
 class CentroidTracker():
     def __init__(self, maxDisappeared=50):
@@ -11,10 +12,9 @@ class CentroidTracker():
         # dictionaries used to keep track of mapping a given object
         # ID to its centroid and number of consecutive frames it has
         # been marked as "disappeared", respectively
-        self.nextObjectID = 1
+        self.nextObjectID = 0
         self.objects = OrderedDict()
         self.disappeared = OrderedDict()
-
         # store the number of maximum consecutive frames a given
         # object is allowed to be marked as "disappeared" until we
         # need to deregister the object from tracking
@@ -157,15 +157,19 @@ class CentroidTracker():
 dilate_kernel = np.ones((5,5),np.uint8)
 knn_subtractor = cv2.createBackgroundSubtractorKNN()
   
-#cap = cv2.VideoCapture(R"C:\Users\rain\Desktop\OPENCV TEST VIDEOS\b4.mp4")
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(R"C:\Users\rain\Desktop\OPENCV TEST VIDEOS\test2.mp4")
+# cap = cv2.VideoCapture(0)
 time.sleep(2)
 ct = CentroidTracker()
-(H, W) = (640, 480)
+queue = OrderedDict()
+colorDict = OrderedDict()
+colors = [(255,255,255),(0,255,255),(255,0,255),(255,255,0),(255,0,0),(0,0,0),(0,255,0)]
 while(1):
 
     ret, frame = cap.read(); 
-    frame = cv2.resize(frame, dsize=(640,480))
+    if ret is False:
+        break
+    frame = cv2.resize(frame, (640,480))
     # frame = cv2.flip(frame,1)
     mask = knn_subtractor.apply(frame)
     mask = cv2.GaussianBlur(mask,(7,7),0)
@@ -176,24 +180,33 @@ while(1):
 
     for cnt in contours:
         if cv2.contourArea(cnt) >= 3000:
-            box = np.array(cv2.boundingRect(cnt))
-            (startX, startY, endX, endY) = box.astype("int")
+            (startX, startY, endX, endY) = np.array(cv2.boundingRect(cnt)).astype("int")
             box = np.array([startX, startY, (startX+endX), (startY+endY)])
             rects.append(box.astype(int))
             cv2.rectangle(frame, (startX, startY), (startX+endX, startY+endY),(0, 255, 0), 2)
         
     objects = ct.update(rects)
-
+    
+    for (objectID,centroid) in objects.items():
+        if objectID not in queue:
+            queue[objectID] = deque(maxlen=64)
+            colorDict[objectID] = colors[random.randint(0,len(colors)-1)]
+            queue[objectID].appendleft((centroid[0],centroid[1]))
+        else:
+            queue[objectID].appendleft((centroid[0],centroid[1]))
+    
     for (objectID, centroid) in objects.items():
         text = "ID {}".format(objectID)
         cv2.putText(frame, text, (centroid[0] - 10, centroid[1] - 10),cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
         cv2.circle(frame, (centroid[0], centroid[1]), 4, (0, 255, 0), -1)
 
-    cv2.imshow('direction', frame)
-    cv2.imshow('mask',mask)
-    key = cv2.waitKey(20) & 0xFF
+        for i in range(1,len(queue[objectID])):
+            cv2.line(frame,queue[objectID][i-1],queue[objectID][i],colorDict[objectID],2)
 
-    if(key == ord('q')):
+    cv2.imshow('frame', frame)
+    cv2.imshow('mask',mask)
+
+    if(cv2.waitKey(20) & 0xFF == ord('q')):
         break
 
 cv2.destroyAllWindows()
