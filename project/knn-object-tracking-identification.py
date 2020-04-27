@@ -154,16 +154,22 @@ class CentroidTracker():
         # return the set of trackable objects
         return self.objects
 
+# this method gives randomized bgr color as a tuple. 
+def get_random_color():
+    r = random.randint(0,random.randint(100,255))
+    g = random.randint(0,random.randint(120,255))
+    b = random.randint(0,random.randint(150,255))
+    return (b,g,r)
+
 dilate_kernel = np.ones((5,5),np.uint8)
 knn_subtractor = cv2.createBackgroundSubtractorKNN()
   
-cap = cv2.VideoCapture(R"C:\Users\rain\Desktop\OPENCV TEST VIDEOS\test2.mp4")
+cap = cv2.VideoCapture(R"C:\Users\rain\Desktop\OPENCV TEST VIDEOS\test4.mp4")
 # cap = cv2.VideoCapture(0)
 time.sleep(2)
 ct = CentroidTracker()
 queue = OrderedDict()
 colorDict = OrderedDict()
-colors = [(255,255,255),(0,255,255),(255,0,255),(255,255,0),(255,0,0),(0,0,0),(0,255,0)]
 while(1):
 
     ret, frame = cap.read(); 
@@ -186,17 +192,15 @@ while(1):
             cv2.rectangle(frame, (startX, startY), (startX+endX, startY+endY),(0, 255, 0), 2)
         
     objects = ct.update(rects)
-    
-    for (objectID,centroid) in objects.items():
-        if objectID not in queue:
-            queue[objectID] = deque(maxlen=64)
-            colorDict[objectID] = colors[random.randint(0,len(colors)-1)]
-            queue[objectID].appendleft((centroid[0],centroid[1]))
-        else:
-            queue[objectID].appendleft((centroid[0],centroid[1]))
-    
+
     for (objectID, centroid) in objects.items():
-        text = "ID {}".format(objectID)
+        if objectID not in queue:
+            queue[objectID] = deque(maxlen=32)
+            colorDict[objectID] = get_random_color()
+
+        queue[objectID].appendleft((centroid[0],centroid[1]))
+
+        text = "object {}".format(objectID)
         cv2.putText(frame, text, (centroid[0] - 10, centroid[1] - 10),cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
         cv2.circle(frame, (centroid[0], centroid[1]), 4, (0, 255, 0), -1)
 
