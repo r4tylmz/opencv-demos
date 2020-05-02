@@ -1,10 +1,11 @@
-import numpy as np 
-import cv2 
-from collections import deque
-from scipy.spatial import distance as dist
-from collections import OrderedDict
-import time
 import random
+import time
+from collections import OrderedDict, deque
+
+import cv2
+import numpy as np
+from scipy.spatial import distance as dist
+
 
 class CentroidTracker():
     def __init__(self, maxDisappeared=50):
@@ -88,12 +89,10 @@ class CentroidTracker():
             # with the smallest value as at the *front* of the index
             # list
             rows = D.min(axis=1).argsort()
-
             # next, we perform a similar process on the columns by
             # finding the smallest value in each column and then
             # sorting using the previously computed row index list
             cols = D.argmin(axis=1)[rows]
-
             # in order to determine if we need to update, register,
             # or deregister an object we need to keep track of which
             # of the rows and column indexes we have already examined
@@ -125,7 +124,6 @@ class CentroidTracker():
             # examined
             unusedRows = set(range(0, D.shape[0])).difference(usedRows)
             unusedCols = set(range(0, D.shape[1])).difference(usedCols)
-
             # in the event that the number of object centroids is
             # equal or greater than the number of input centroids
             # we need to check and see if some of these objects have
@@ -164,7 +162,7 @@ def get_random_color():
 dilate_kernel = np.ones((5,5),np.uint8)
 knn_subtractor = cv2.createBackgroundSubtractorKNN()
   
-cap = cv2.VideoCapture(R"C:\Users\rain\Desktop\OPENCV TEST VIDEOS\test4.mp4")
+cap = cv2.VideoCapture(R"C:\Users\rain\Desktop\OPENCV TEST VIDEOS\test6.mp4")
 # cap = cv2.VideoCapture(0)
 time.sleep(2)
 ct = CentroidTracker()
@@ -178,10 +176,11 @@ while(1):
     frame = cv2.resize(frame, (640,480))
     # frame = cv2.flip(frame,1)
     mask = knn_subtractor.apply(frame)
+    mask = cv2.morphologyEx(mask,cv2.MORPH_OPEN,dilate_kernel)
     mask = cv2.GaussianBlur(mask,(7,7),0)
     mask = cv2.dilate(mask,dilate_kernel,iterations=2)
 
-    contours,_ = cv2.findContours(mask,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+    contours,_ = cv2.findContours(mask,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
     rects = []
 
     for cnt in contours:
@@ -189,7 +188,7 @@ while(1):
             (startX, startY, endX, endY) = np.array(cv2.boundingRect(cnt)).astype("int")
             box = np.array([startX, startY, (startX+endX), (startY+endY)])
             rects.append(box.astype(int))
-            cv2.rectangle(frame, (startX, startY), (startX+endX, startY+endY),(0, 255, 0), 2)
+            cv2.rectangle(frame, (startX, startY), (startX+endX, startY+endY),(255, 0, 0), 2)
         
     objects = ct.update(rects)
 
@@ -199,9 +198,11 @@ while(1):
             colorDict[objectID] = get_random_color()
 
         queue[objectID].appendleft((centroid[0],centroid[1]))
-
-        text = "object {}".format(objectID)
-        cv2.putText(frame, text, (centroid[0] - 10, centroid[1] - 10),cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+        
+        text = f"id: {objectID}"
+        coordinates = f"{centroid}"
+        cv2.putText(frame, text, (centroid[0] - 10, centroid[1] - 10),cv2.FONT_HERSHEY_DUPLEX, 0.6, (0, 0, 255), 1)
+        cv2.putText(frame, coordinates, (centroid[0]-10, centroid[1] + 20),cv2.FONT_HERSHEY_DUPLEX, 0.6, (0, 255, 0), 1)
         cv2.circle(frame, (centroid[0], centroid[1]), 4, (0, 255, 0), -1)
 
         for i in range(1,len(queue[objectID])):
