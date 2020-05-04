@@ -8,7 +8,7 @@ from scipy.spatial import distance as dist
 
 
 class CentroidTracker():
-    def __init__(self, maxDisappeared=50):
+    def __init__(self, maxDisappeared=120):
         # initialize the next unique object ID along with two ordered
         # dictionaries used to keep track of mapping a given object
         # ID to its centroid and number of consecutive frames it has
@@ -159,15 +159,43 @@ def get_random_color():
     b = random.randint(0,random.randint(150,255))
     return (b,g,r)
 
-dilate_kernel = np.ones((5,5),np.uint8)
+# this method filters frame that we are using
+def filter_mask(frame):
+    dilate_kernel = np.ones((5,5),np.uint8)
+    morph_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+    mask = knn_subtractor.apply(frame)
+    mask = cv2.morphologyEx(mask,cv2.MORPH_CLOSE,morph_kernel)
+    mask = cv2.morphologyEx(mask,cv2.MORPH_OPEN,morph_kernel)
+    mask = cv2.GaussianBlur(mask,(7,7),0)
+    mask = cv2.dilate(mask,dilate_kernel,iterations=2)
+    return mask
+
+def get_direction_name(dX,dY):
+    (dirX, dirY) = ("", "")
+
+    if np.abs(dX) > 10:
+        dirX = "Bati" if np.sign(dX) == 1 else "Dogu"
+    if np.abs(dY) > 10:
+        dirY = "Kuzey" if np.sign(dY) == 1 else "Guney"
+    
+    if dirX != "" and dirY != "":
+        direction_name = "{}-{}".format(dirY, dirX)
+    else:
+        direction_name = dirX if dirX != "" else dirY
+
+    return direction_name
+
 knn_subtractor = cv2.createBackgroundSubtractorKNN()
   
-cap = cv2.VideoCapture(R"C:\Users\rain\Desktop\OPENCV TEST VIDEOS\test6.mp4")
+cap = cv2.VideoCapture(R"C:\Users\rain\Desktop\OPENCV TEST VIDEOS\b4.mp4")
 # cap = cv2.VideoCapture(0)
-time.sleep(2)
+time.sleep(1)
 ct = CentroidTracker()
 queue = OrderedDict()
 colorDict = OrderedDict()
+directionDict = OrderedDict()
+
+
 while(1):
 
     ret, frame = cap.read(); 
@@ -175,12 +203,8 @@ while(1):
         break
     frame = cv2.resize(frame, (640,480))
     # frame = cv2.flip(frame,1)
-    mask = knn_subtractor.apply(frame)
-    mask = cv2.morphologyEx(mask,cv2.MORPH_OPEN,dilate_kernel)
-    mask = cv2.GaussianBlur(mask,(7,7),0)
-    mask = cv2.dilate(mask,dilate_kernel,iterations=2)
-
-    contours,_ = cv2.findContours(mask,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+    mask = filter_mask(frame)
+    contours,_ = cv2.findContours(mask,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
     rects = []
 
     for cnt in contours:
@@ -196,13 +220,18 @@ while(1):
         if objectID not in queue:
             queue[objectID] = deque(maxlen=32)
             colorDict[objectID] = get_random_color()
-
         queue[objectID].appendleft((centroid[0],centroid[1]))
-        
+
+        direction_name = ""
+        if len(queue[objectID]) >= 5:
+            lx,ly= queue[objectID][-1]
+            x,y= queue[objectID][1]
+            direction_name = get_direction_name(lx-x,ly-y)
+            
         text = f"id: {objectID}"
         coordinates = f"{centroid}"
         cv2.putText(frame, text, (centroid[0] - 10, centroid[1] - 10),cv2.FONT_HERSHEY_DUPLEX, 0.6, (0, 0, 255), 1)
-        cv2.putText(frame, coordinates, (centroid[0]-10, centroid[1] + 20),cv2.FONT_HERSHEY_DUPLEX, 0.6, (0, 255, 0), 1)
+        cv2.putText(frame, direction_name, (centroid[0]-10, centroid[1] + 20),cv2.FONT_HERSHEY_DUPLEX, 0.6, (0, 255, 0), 1)
         cv2.circle(frame, (centroid[0], centroid[1]), 4, (0, 255, 0), -1)
 
         for i in range(1,len(queue[objectID])):
@@ -211,7 +240,7 @@ while(1):
     cv2.imshow('frame', frame)
     cv2.imshow('mask',mask)
 
-    if(cv2.waitKey(20) & 0xFF == ord('q')):
+    if(cv2.waitKey(25) & 0xFF == ord('q')):
         break
 
 cv2.destroyAllWindows()
